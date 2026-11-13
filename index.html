@@ -5,11 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Sõnapüramiid</title>
 <meta name="description" content="Eesti liitsõnade püramiidimäng: lao sõnad nii, et iga joon annaks ülevalt alla loetava liitsõna.">
+<meta name="sp-version" content="5">
 <meta name="theme-color" content="#000000">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="icon" href="icons/icon-192.png">
-<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/style.css?v=5">
 </head>
 <body>
 <div class="app" id="app">
@@ -24,6 +25,7 @@
     <button class="opt" id="optDaily"><b>Päevamäng</b><span id="subDaily"></span></button>
     <button class="opt" id="optCamp"><b>Kampaania</b><span id="subCamp"></span></button>
     <button class="opt" id="optLb"><b>Tänane edetabel</b><span id="subLb"></span></button>
+    <button class="opt" id="optYday"><b>Eilne lahendus</b><span>Vaata, kuidas eilne püramiid kokku käis</span></button>
     <button class="opt" id="optGuide"><b>Kuidas mängida</b><span>Viis lühikest sammu liikuvate näidetega</span></button>
     <section id="statsSec" hidden style="padding-top:18px">
       <h2>Sinu päevamängud</h2>
@@ -43,7 +45,10 @@
 
   <div id="lbView" hidden>
     <section>
-      <h2 id="lbTitle">Tänane edetabel</h2>
+      <h2 id="lbTitle">Edetabel</h2>
+      <div class="theme" style="padding-top:0">
+        <button id="lbTabDay" aria-pressed="true">Täna</button><button id="lbTabWeek" aria-pressed="false">Nädal</button>
+      </div>
       <p class="note" id="lbNote"></p>
       <button class="btn" id="lbAdd" hidden style="align-self:flex-start">Lisa minu tulemus</button>
       <ol class="lb" id="lb"></ol>
@@ -61,10 +66,25 @@
     </section>
   </div>
 
+  <div id="ydayView" hidden>
+    <section>
+      <h2 id="ydayTitle">Eilne lahendus</h2>
+      <div class="board" id="board3"></div>
+    </section>
+    <section>
+      <h2>Liitsõnad</h2>
+      <ul class="words" id="ydayWords"></ul>
+    </section>
+  </div>
+
   <div id="levelsView" hidden>
     <section>
       <h2 id="campTitle">Kampaania</h2>
       <p class="note">Püramiid kasvab tasemetega. Mida kiiremini lahendad, seda rohkem tähti saad.</p>
+      <div class="theme" style="padding-top:0">
+        <button id="practiceBtn" aria-pressed="false">Harjutusrežiim</button>
+        <span id="practiceNote"></span>
+      </div>
       <div class="levels" id="levels"></div>
     </section>
   </div>
@@ -77,6 +97,7 @@
       <span class="pill tries" id="tries" aria-label="Kontrollimisi alles"></span>
     </div>
     <p class="status" id="status" aria-live="polite"></p>
+    <p class="status" id="hintLine" aria-live="polite" hidden></p>
     <div class="cmp" id="cmp">
       <div><h2 class="cap" id="mineCap" hidden>Sinu katse</h2><div class="board" id="board"><svg id="links" aria-hidden="true"></svg></div></div>
       <div id="solCol" hidden><h2 class="cap">Lahendus</h2><div class="board" id="board2"></div></div>
@@ -90,6 +111,7 @@
     <div class="actions">
       <button class="btn primary" id="checkBtn">Kontrolli</button>
       <button class="btn primary" id="nextBtn" hidden>Järgmine tase</button>
+      <button class="btn" id="hintBtn">Vihje (+30 s)</button>
       <button class="btn" id="retryBtn">Alusta uuesti</button>
       <button class="btn" id="levelsBtn">Tasemed</button>
       <button class="btn" id="lbBtn" hidden>Edetabel</button>
@@ -157,8 +179,8 @@
   </form>
 </div>
 
-<script src="js/config.js"></script>
-<script src="js/puzzles.js"></script>
-<script src="js/game.js"></script>
+<script src="js/config.js?v=5"></script>
+<script src="js/puzzles.js?v=5"></script>
+<script src="js/game.js?v=5"></script>
 </body>
 </html>

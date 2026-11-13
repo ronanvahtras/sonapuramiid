@@ -21,6 +21,8 @@ Open `index.html` in a browser. Nothing needs to be installed.
 | `js/puzzles.js` | Puzzle data, the campaign level list and the daily pool |
 | `js/game.js` | Game logic, navigation, leaderboard, sharing, the animated guide |
 | `supabase/setup.sql` | Database tables and access rules for the leaderboard and word reports |
+| `supabase/weekly.sql` | Adds the weekly leaderboard to a database set up before it existed |
+| `builder.html` | Private helper page for writing new puzzles (not linked from the game) |
 | `sw.js`, `manifest.webmanifest`, `icons/` | Install to home screen and offline play |
 
 ## Leaderboard setup
@@ -70,8 +72,22 @@ Rules for a good puzzle:
   (`käsi` + `kell` = `käekell`).
 - Every compound should be checked against Sõnaveeb or ÕS.
 
+The quickest way to write one is `builder.html`: open it in a browser, type the words into
+the pyramid, fill in each compound and meaning (each has a link to Sõnaveeb), and copy the
+generated code into `P`.
+
 Then add the puzzle's key to `DAILY` (daily rotation) or `CAMP` (campaign, with the time
 limits in seconds for three and two stars).
+
+## Releasing a change
+
+Browsers keep copies of files for a few minutes, so after an update a player could get a new
+page with an old script. To prevent that, the page and the script carry a version number.
+When you change `index.html`, the CSS or any script, raise the number in all three places:
+
+- `index.html`: the `sp-version` meta tag and the `?v=` on the CSS and script links
+- `js/game.js`: `VERSION` at the top
+- `sw.js`: the number in `CACHE`
 
 ## Not built yet
 
