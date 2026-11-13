@@ -89,7 +89,7 @@ function render(){
   $("gameView").style.display=game?"flex":"none";
   if(view==="home"){renderHome();return}
   if(view==="lb"){renderLb();return}
-  if(view==="priv"){$("privContact").textContent=(typeof SITE_CONTACT==="string"&&SITE_CONTACT)?`Kui soovid oma tulemuse kustutamist või sul on küsimusi, kirjuta aadressil ${SITE_CONTACT}. Lisa oma hüüdnimi ja kuupäev.`:"Kontaktaadress lisatakse siia peagi. Seni kustuvad tulemused iseenesest 30 päeva pärast.";return}
+  if(view==="priv") return;
   if(view==="levels"){renderLevels();return}
   const camp=S.mode==="camp", failed=S.done&&!S.won, cmp=failed&&!S.noAttempt;
   $("cmp").classList.toggle("two",cmp); $("solCol").hidden=!cmp;
@@ -125,7 +125,7 @@ function render(){
     msg=`Õiges kohas <b>${n}</b>, vales kohas <b>${o}</b>. Kontrollimisi alles ${MAX-S.checks}.`}
   $("status").innerHTML=msg;
   $("lbBtn").hidden=camp||!S.done||lb.state==="off";
-  $("shareBtn").hidden=camp||!S.done; if(!S.done){$("shareNote").hidden=true}
+  $("shareBtn").hidden=camp||!S.done; if(camp||!S.done) $("sharePanel").hidden=true;
   $("reportBtn").hidden=!API||!(rows.length||S.done);
 }
 function renderHome(){
@@ -315,15 +315,26 @@ $("nickEdit").onclick=openNick;
 $("lbAdd").onclick=()=>{lb.fail=false;submitScore()};
 $("privLink").onclick=()=>nav("priv");
 // Share today's result
-async function share(){
-  const rec=store.get("sp-daily",null); if(!rec||rec.date!==today()) return;
+// "Jaga tulemust" always shows the text and copies it, so something visible happens on every
+// device. Where the phone offers its own share sheet, a second button opens that.
+function shareTextNow(){
+  const rec=store.get("sp-daily",null); if(!rec||rec.date!==today()) return "";
   const d=today().split("-").reverse().slice(0,2).join(".");
-  const text=(rec.won?`Sõnapüramiid ${d} · ${fmt(rec.ms/1000)} · ${rec.moves} käiku · ${rec.checks} kontrolli`:`Sõnapüramiid ${d} · täna jäi püramiid lahendamata`)+"\n"+location.origin+location.pathname;
-  const note=$("shareNote"); note.hidden=false;
-  try{if(navigator.share){await navigator.share({text});note.hidden=true;return}}catch(e){if(e&&e.name==="AbortError"){note.hidden=true;return}}
-  try{await navigator.clipboard.writeText(text);note.textContent="Tulemus on kopeeritud. Kleebi see sõnumisse."}
-  catch(e){note.textContent=text}
+  return (rec.won?`Sõnapüramiid ${d} · ${fmt(rec.ms/1000)} · ${rec.moves} käiku · ${rec.checks} kontrolli`:`Sõnapüramiid ${d} · täna jäi püramiid lahendamata`)+"\n"+location.origin+location.pathname;
 }
+async function copyShare(){
+  const box=$("shareText"), note=$("shareNote"); let ok=false;
+  try{await navigator.clipboard.writeText(box.value);ok=true}catch(e){}
+  if(!ok){try{box.focus();box.select();box.setSelectionRange(0,box.value.length);ok=document.execCommand("copy")}catch(e){}}
+  note.textContent=ok?"Tulemus on kopeeritud. Kleebi see sõnumisse.":"Kopeerimine ei õnnestunud. Vali tekst ja kopeeri see käsitsi.";
+}
+function share(){
+  const text=shareTextNow(); if(!text) return;
+  $("shareText").value=text; $("sharePanel").hidden=false; $("shareSend").hidden=!navigator.share;
+  copyShare();
+}
+$("shareCopy").onclick=copyShare;
+$("shareSend").onclick=()=>{try{navigator.share({text:$("shareText").value}).catch(()=>{})}catch(e){}};
 $("shareBtn").onclick=share;
 // Report a word
 function openReport(){
