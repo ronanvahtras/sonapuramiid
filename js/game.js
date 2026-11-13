@@ -1,3 +1,12 @@
+// Version guard. A browser can briefly hold an old page with a new script (or the other way
+// round) right after an update, which breaks the game. The page and this script carry the
+// same version number; if they differ, the page is fetched fresh once.
+const VERSION="5";
+(function(){
+  const m=document.querySelector('meta[name="sp-version"]'); if(m&&m.content===VERSION) return;
+  try{if(sessionStorage.getItem("sp-reload")===VERSION) return; sessionStorage.setItem("sp-reload",VERSION)}catch(e){return}
+  location.replace(location.pathname+"?v="+VERSION+"-"+Date.now());
+})();
 const MAX=4;
 const $=id=>document.getElementById(id);
 const board=$("board"), svg=$("links");

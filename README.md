@@ -79,6 +79,16 @@ generated code into `P`.
 Then add the puzzle's key to `DAILY` (daily rotation) or `CAMP` (campaign, with the time
 limits in seconds for three and two stars).
 
+## Releasing a change
+
+Browsers keep copies of files for a few minutes, so after an update a player could get a new
+page with an old script. To prevent that, the page and the script carry a version number.
+When you change `index.html`, the CSS or any script, raise the number in all three places:
+
+- `index.html`: the `sp-version` meta tag and the `?v=` on the CSS and script links
+- `js/game.js`: `VERSION` at the top
+- `sw.js`: the number in `CACHE`
+
 ## Not built yet
 
 - **Cheat-proof scores** (see the known limit above).
