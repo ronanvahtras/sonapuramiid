@@ -1,6 +1,6 @@
 // Offline support. Network first, so players always get the newest version when online;
 // the saved copy is only used when there is no connection.
-const CACHE="sonapuramiid-v1";
+const CACHE="sonapuramiid-v2";
 const FILES=["./","index.html","css/style.css","js/config.js","js/puzzles.js","js/game.js","manifest.webmanifest","icons/icon-192.png"];
 self.addEventListener("install",e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(FILES)).then(()=>self.skipWaiting()))});
 self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()))});

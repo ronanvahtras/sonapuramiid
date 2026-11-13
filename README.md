@@ -17,7 +17,7 @@ Open `index.html` in a browser. Nothing needs to be installed.
 | --- | --- |
 | `index.html` | Page structure: home, game, leaderboard, privacy page, guide, dialogs |
 | `css/style.css` | All styling. Every colour is a token in the `:root` block at the top |
-| `js/config.js` | Supabase address and publishable key, public contact address |
+| `js/config.js` | Supabase address and publishable key |
 | `js/puzzles.js` | Puzzle data, the campaign level list and the daily pool |
 | `js/game.js` | Game logic, navigation, leaderboard, sharing, the animated guide |
 | `supabase/setup.sql` | Database tables and access rules for the leaderboard and word reports |
@@ -32,7 +32,6 @@ The daily leaderboard and the "report a word" form use a Supabase database.
    access rules, and a nightly job that deletes scores older than 30 days.
 2. `js/config.js` already holds the project address and the publishable key. The
    publishable key is safe to keep in the code; a secret key must never be added.
-3. Set `SITE_CONTACT` in `js/config.js` to the public address shown on the privacy page.
 
 How it works: players have no accounts. Each browser keeps a random id and a nickname.
 One result per player per day is accepted, only for the current day in Tallinn time.

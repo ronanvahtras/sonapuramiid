@@ -53,20 +53,11 @@
   <div id="privView" hidden>
     <section class="prose">
       <h2>Privaatsus</h2>
-      <p>Sõnapüramiid kogub nii vähe andmeid kui võimalik. Kontot ega registreerimist ei ole.</p>
-      <h3>Mis salvestatakse sinu seadmes</h3>
-      <p>Sinu brauser hoiab mängu seisu: kampaania tähed, tänase päevamängu tulemus, sinu statistika, valitud välimus, hüüdnimi ja juhuslik mängija tunnus. Need andmed ei lahku seadmest, välja arvatud allpool kirjeldatud juhul. Kustutada saad need brauseri saidiandmete kustutamisega.</p>
-      <h3>Mis saadetakse edetabelisse</h3>
-      <p>Kui lõpetad päevamängu ja lisad tulemuse edetabelisse, salvestatakse serverisse sinu hüüdnimi, kuupäev, aeg, käikude ja kontrollimiste arv ning juhuslik mängija tunnus. Tunnus on vajalik selleks, et igalt mängijalt oleks päevas üks tulemus; teistele mängijatele seda ei näidata. Hüüdnimi, aeg ja käigud on kõigile nähtavad.</p>
-      <p>Ära kasuta hüüdnimena oma pärisnime ega muid isikuandmeid. Edetabelisse lisamine on vabatahtlik: mängida saab ka ilma.</p>
-      <h3>Veateated</h3>
+      <p>Sõnapüramiid kogub nii vähe andmeid kui võimalik. Kontot ega registreerimist ei ole ning mängida saab ka ilma edetabelita.</p>
+      <p>Kui lõpetad päevamängu ja lisad tulemuse edetabelisse, salvestatakse serverisse sinu hüüdnimi, kuupäev, aeg, käikude ja kontrollimiste arv ning juhuslik mängija tunnus. Tunnus on vajalik selleks, et igalt mängijalt oleks päevas üks tulemus, ja teistele mängijatele seda ei näidata. Hüüdnimi, aeg ja käigud on kõigile nähtavad, seepärast ära kasuta hüüdnimena oma pärisnime ega muid isikuandmeid.</p>
       <p>Kui teatad veast mõnes sõnas, salvestatakse sõna, sinu märkus ja püramiidi tunnus. Hüüdnime ega mängija tunnust veateatega ei seota.</p>
-      <h3>Kus ja kui kaua</h3>
-      <p>Edetabeli andmeid hoitakse Supabase'i andmebaasis. Tulemused kustutatakse 30 päeva pärast. Veebileht asub GitHub Pagesi serveris; nagu iga veebiserver, näeb see lehe laadimisel sinu IP-aadressi.</p>
-      <h3>Mida ei tehta</h3>
+      <p>Edetabeli andmeid hoitakse Supabase'i andmebaasis ja tulemused kustutatakse 30 päeva pärast. Veebileht asub GitHub Pagesi serveris, mis näeb lehe laadimisel sinu IP-aadressi nagu iga veebiserver.</p>
       <p>Mängus ei ole reklaame, jälgimisküpsiseid ega külastusstatistika teenuseid. Andmeid ei müüda ega jagata kolmandatele isikutele.</p>
-      <h3>Kustutamine ja küsimused</h3>
-      <p id="privContact"></p>
     </section>
   </div>
 
@@ -104,7 +95,14 @@
       <button class="btn" id="lbBtn" hidden>Edetabel</button>
       <button class="btn" id="shareBtn" hidden>Jaga tulemust</button>
     </div>
-    <p class="note" id="shareNote" aria-live="polite" hidden></p>
+    <div id="sharePanel" hidden style="display:flex;flex-direction:column;gap:8px;max-width:520px">
+      <textarea class="field" id="shareText" rows="3" readonly aria-label="Jagatav tulemus"></textarea>
+      <p class="note" id="shareNote" aria-live="polite"></p>
+      <div class="actions">
+        <button class="btn small" id="shareCopy">Kopeeri</button>
+        <button class="btn small" id="shareSend" hidden>Saada rakendusega…</button>
+      </div>
+    </div>
     <section id="found" hidden>
       <h2>Leitud liitsõnad</h2>
       <ul class="words" id="words"></ul>
