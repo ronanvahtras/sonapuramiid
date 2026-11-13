@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="et">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Sõnapüramiidi koostaja</title>
+<link rel="stylesheet" href="css/style.css">
+<style>
+/* Puzzle builder: a private helper page, not linked from the game. */
+.row{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.row input{width:104px;text-align:center}
+.pair{display:grid;grid-template-columns:minmax(120px,170px) minmax(110px,1fr) minmax(140px,2fr) auto;gap:8px;align-items:center}
+.pair .lab{font-weight:600;font-size:14.5px}
+.pair a{color:var(--ink);font-size:14px;white-space:nowrap}
+@media (max-width:640px){.pair{grid-template-columns:1fr 1fr}}
+.issues{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:4px;font-size:15px}
+.issues li.ok{list-style:"✓  "}
+.issues li.bad{list-style:"×  "}
+select.field{width:auto}
+textarea.field{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px}
+</style>
+</head>
+<body>
+<div class="app">
+  <header><h1>Sõnapüramiidi koostaja</h1></header>
+  <p class="note">Kirjuta sõnad püramiidi, täida iga paari liitsõna ja tähendus ning kopeeri valmis kood. Mustand jääb sellesse brauserisse alles.</p>
+
+  <section>
+    <h2>1. Suurus ja tunnus</h2>
+    <div class="actions">
+      <label class="note" for="size">Sõnu</label>
+      <select id="size" class="field"><option value="3">3</option><option value="7">7</option><option value="15" selected>15</option></select>
+      <label class="note" for="key">Tunnus (lühike, nt p21)</label>
+      <input id="key" class="field" style="width:110px" maxlength="8" autocapitalize="off">
+      <button class="btn small" id="clear">Tühjenda kõik</button>
+    </div>
+  </section>
+
+  <section>
+    <h2>2. Sõnad (algvormis, ülevalt alla)</h2>
+    <div id="rows" style="display:flex;flex-direction:column;gap:10px"></div>
+  </section>
+
+  <section>
+    <h2>3. Paarid: ülemine sõna + alumine sõna</h2>
+    <p class="note">Liitsõna kirjuta päris kujul (käsi + kell = käekell). Link avab sõna Sõnaveebis.</p>
+    <div id="pairs" style="display:flex;flex-direction:column;gap:8px"></div>
+  </section>
+
+  <section>
+    <h2>4. Muud päris liitsõnad samade sõnade vahel</h2>
+    <p class="note">Üks rida paari kohta: ülemine, alumine, liitsõna, tähendus. Mängus näitab neid kollane joon.</p>
+    <textarea id="extra" class="field" rows="5" placeholder="lill, pood, lillepood, pood, kus müüakse lilli"></textarea>
+  </section>
+
+  <section>
+    <h2>5. Kontroll</h2>
+    <ul class="issues" id="issues"></ul>
+  </section>
+
+  <section>
+    <h2>6. Kood</h2>
+    <p class="note">Kleebi see faili js/puzzles.js objekti P sisse või saada Claude'ile.</p>
+    <textarea id="out" class="field" rows="8" readonly></textarea>
+    <div class="actions"><button class="btn primary" id="copy">Kopeeri kood</button><span class="note" id="copied" aria-live="polite"></span></div>
+  </section>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const parent=c=>(c-1)>>1;
+const KEY="sp-builder";
+let D={size:15,key:"",w:[],c:[],m:[],extra:""};
+try{const s=JSON.parse(localStorage.getItem(KEY));if(s&&s.w)D=s}catch(e){}
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(D))}catch(e){}};
+const q=s=>JSON.stringify(s);
+
+function build(){
+  const n=D.size; $("size").value=n; $("key").value=D.key; $("extra").value=D.extra;
+  const rows=$("rows"); rows.innerHTML="";
+  for(let d=0,i=0;i<n;d++){const r=document.createElement("div");r.className="row";
+    for(let k=0;k<2**d&&i<n;k++,i++){const inp=document.createElement("input");inp.className="field";inp.value=D.w[i]||"";inp.maxLength=14;
+      inp.autocapitalize="off";inp.setAttribute("aria-label","Sõna "+(i+1));const j=i;
+      inp.addEventListener("input",()=>{D.w[j]=inp.value.trim().toLowerCase();pairs();check();save()});r.appendChild(inp)}
+    rows.appendChild(r)}
+  pairs(); check();
+}
+function pairs(){
+  const box=$("pairs"), n=D.size, focus=document.activeElement&&document.activeElement.dataset.f; box.innerHTML="";
+  for(let c=1;c<n;c++){const up=D.w[parent(c)]||"?", lo=D.w[c]||"?";
+    const row=document.createElement("div");row.className="pair";
+    const lab=document.createElement("span");lab.className="lab";lab.textContent=`${up} + ${lo}`;
+    const ci=document.createElement("input");ci.className="field";ci.placeholder="liitsõna";ci.value=D.c[c]||"";ci.autocapitalize="off";ci.dataset.f="c"+c;
+    const mi=document.createElement("input");mi.className="field";mi.placeholder="tähendus";mi.value=D.m[c]||"";mi.dataset.f="m"+c;
+    const a=document.createElement("a");a.target="_blank";a.rel="noopener";a.textContent="Sõnaveeb";
+    const link=()=>{const w=(D.c[c]||"").trim();a.href="https://sonaveeb.ee/search/unif/dlall/dsall/"+encodeURIComponent(w);a.style.visibility=w?"visible":"hidden"};
+    ci.addEventListener("input",()=>{D.c[c]=ci.value.trim().toLowerCase();link();check();save()});
+    mi.addEventListener("input",()=>{D.m[c]=mi.value.trim();check();save()});
+    link(); row.append(lab,ci,mi,a); box.appendChild(row)}
+  if(focus){const el=box.querySelector(`[data-f="${focus}"]`);if(el)el.focus()}
+}
+function extras(){
+  const out=[],bad=[];
+  D.extra.split("\n").map(l=>l.trim()).filter(Boolean).forEach((l,i)=>{const p=l.split(",").map(x=>x.trim());
+    if(p.length<4||p.slice(0,4).some(x=>!x)) bad.push(i+1); else out.push([p[0].toLowerCase(),p[1].toLowerCase(),p[2].toLowerCase(),p.slice(3).join(", ")])});
+  return {out,bad};
+}
+function check(){
+  const n=D.size, w=D.w.slice(0,n), is=[], add=(ok,t)=>is.push([ok,t]);
+  const filled=w.filter(Boolean).length; add(filled===n,`Sõnu täidetud: ${filled}/${n}`);
+  const dup=w.filter((x,i)=>x&&w.indexOf(x)!==i); add(!dup.length,dup.length?`Korduvad sõnad: ${[...new Set(dup)].join(", ")}`:"Kõik sõnad on erinevad");
+  let miss=0,odd=[];
+  for(let c=1;c<n;c++){const comp=D.c[c]||"", up=w[parent(c)]||"", lo=w[c]||"";
+    if(!comp||!(D.m[c]||"")) miss++;
+    else if(up&&lo&&(!comp.endsWith(lo)||comp[0]!==up[0])) odd.push(comp)}
+  add(!miss,miss?`Täitmata liitsõnu või tähendusi: ${miss}`:"Kõigil paaridel on liitsõna ja tähendus");
+  if(odd.length) add(false,`Vaata üle (liitsõna ei alga ülemise sõna tähega või ei lõpe alumise sõnaga): ${odd.join(", ")}`);
+  const allc=[];for(let c=1;c<n;c++) if(D.c[c]) allc.push(D.c[c]);
+  const dc=allc.filter((x,i)=>allc.indexOf(x)!==i); if(dc.length) add(false,`Sama liitsõna kaks korda: ${[...new Set(dc)].join(", ")}`);
+  const ex=extras(); if(ex.bad.length) add(false,`Lisapaaride read vales vormis: ${ex.bad.join(", ")}`);
+  const stray=ex.out.filter(e=>!w.includes(e[0])||!w.includes(e[1])); if(stray.length) add(false,`Lisapaarides on sõnu, mida püramiidis pole: ${stray.map(e=>e[2]).join(", ")}`);
+  const sol=new Set();for(let c=1;c<n;c++) sol.add(w[parent(c)]+">"+w[c]);
+  const rep=ex.out.filter(e=>sol.has(e[0]+">"+e[1])); if(rep.length) add(false,`Lisapaar kordab lahenduse paari: ${rep.map(e=>e[2]).join(", ")}`);
+  add(!!D.key,D.key?`Tunnus: ${D.key}`:"Tunnus puudub");
+  $("issues").innerHTML=is.map(([ok,t])=>`<li class="${ok?"ok":"bad"}"></li>`).join("");
+  [...$("issues").children].forEach((li,i)=>li.textContent=is[i][1]);
+  const s=[];for(let c=1;c<n;c++) s.push(`[${q(D.c[c]||"")},${q(D.m[c]||"")}]`);
+  $("out").value=` ${D.key||"tunnus"}:{w:[${w.map(x=>q(x||"")).join(",")}],\n  s:[${s.join(",")}],\n  x:[${ex.out.map(e=>"["+e.map(q).join(",")+"]").join(",")}]},`;
+}
+$("size").addEventListener("change",()=>{D.size=Number($("size").value);save();build()});
+$("key").addEventListener("input",()=>{D.key=$("key").value.trim();check();save()});
+$("extra").addEventListener("input",()=>{D.extra=$("extra").value;check();save()});
+$("clear").addEventListener("click",()=>{D={size:D.size,key:"",w:[],c:[],m:[],extra:""};save();build()});
+$("copy").addEventListener("click",async()=>{const o=$("out");let ok=false;
+  try{await navigator.clipboard.writeText(o.value);ok=true}catch(e){}
+  if(!ok){try{o.focus();o.select();ok=document.execCommand("copy")}catch(e){}}
+  $("copied").textContent=ok?"Kopeeritud.":"Kopeerimine ei õnnestunud. Vali tekst ja kopeeri käsitsi."});
+build();
+</script>
+</body>
+</html>

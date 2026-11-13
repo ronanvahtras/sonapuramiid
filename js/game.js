@@ -11,9 +11,9 @@ const dayNum=()=>{const [y,m,d]=today().split("-").map(Number);return Math.floor
 const store={get(k,f){try{return JSON.parse(localStorage.getItem(k))??f}catch(e){return f}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
 const starsHtml=n=>`<span class="stars">${"★".repeat(n)}<span class="off">${"★".repeat(3-n)}</span></span>`;
 
-let view="home", hist=[], dailyS=null, campS=null, S=null, N=15, pairs, solParent, solDepth, tiles={}, paths=[], hits=[], marks=[], sel=null, lastTick=0;
+let view="home", hist=[], dailyS=null, campS=null, S=null, N=15, pairs, solParent, solDepth, tiles={}, paths=[], hits=[], marks=[], practice=false, lbMode="day", sel=null, lastTick=0;
 const API=typeof SUPABASE_URL==="string"&&SUPABASE_URL&&typeof SUPABASE_KEY==="string"&&SUPABASE_KEY?SUPABASE_URL+"/rest/v1/":"";
-let lb={state:API?"loading":"off",rows:[]};
+let lb={state:API?"loading":"off",rows:[]}, wk={state:"idle",rows:[]};
 const NICK_RE=/^[A-Za-zÕÄÖÜŠŽõäöüšž0-9 _.\-]{2,16}$/;
 
 function prep(){
@@ -35,7 +35,7 @@ function startGame(mode,pz,lvl,seed){
   do{o=P[pz].w.slice();for(let i=N-1;i>0;i--){const j=Math.floor(r()*(i+1));[o[i],o[j]]=[o[j],o[i]]} v=validCount(o)}
   while((v>lim||v===N-1) && ++t<500);
   if(v===N-1){[o[0],o[1]]=[o[1],o[0]]}
-  S.order=o; if(mode==="camp") campS=S; build(); render();
+  S.order=o; S.practice=mode==="camp"&&practice; if(mode==="camp") campS=S; build(); render();
 }
 function showSolved(mode,pz,lvl,rec){
   const sol=P[pz].w, mine=!rec.won&&Array.isArray(rec.order)&&rec.order.length===sol.length&&rec.order.every(w=>sol.includes(w))?rec.order:null;
@@ -73,23 +73,38 @@ function layout(){
   for(let c=1;c<N;c++){const d=g.path(c);paths[c].setAttribute("d",d);hits[c].setAttribute("d",d);
     const q=paths[c].getPointAtLength(paths[c].getTotalLength()/2);marks[c].setAttribute("transform",`translate(${q.x},${q.y})`)}
 }
-function drawSolution(){ // read-only copy of the solved pyramid, shown beside a failed attempt
-  const b=$("board2"), W=b.clientWidth, g=geom(W); b.style.height=g.H+"px";
+function drawSolved(b,pz){ // read-only copy of a solved pyramid
+  const keep=N; N=P[pz].w.length;
+  const W=b.clientWidth, g=geom(W); b.style.height=g.H+"px";
   let h=`<svg viewBox="0 0 ${W} ${g.H}" aria-hidden="true">`;
   for(let c=1;c<N;c++) h+=`<path class="g" d="${g.path(c)}"/>`;
   h+="</svg>";
-  P[S.pz].w.forEach((w,i)=>{const p=g.pos(i);
+  P[pz].w.forEach((w,i)=>{const p=g.pos(i);
     h+=`<div class="tile" style="width:${g.tw}px;height:${g.th}px;font-size:${g.fs}px;transform:translate(${p.x-g.tw/2}px,${p.y-g.th/2}px)">${w}</div>`});
-  b.innerHTML=h;
+  b.innerHTML=h; N=keep;
+}
+const drawSolution=()=>drawSolved($("board2"),S.pz);
+function renderYday(){
+  const pz=DAILY[(dayNum()-1)%DAILY.length], d=new Date((dayNum()-1)*864e5);
+  $("ydayTitle").textContent=`Eilne lahendus · ${String(d.getUTCDate()).padStart(2,"0")}.${String(d.getUTCMonth()+1).padStart(2,"0")}`;
+  drawSolved($("board3"),pz);
+  $("ydayWords").innerHTML=P[pz].s.map(x=>`<li class="g"><b>${x[0]}</b>${x[1]}</li>`).join("");
+}
+// Time left until the game's day changes (midnight in Tallinn).
+function untilNext(){
+  try{const p=Object.fromEntries(new Intl.DateTimeFormat("en-GB",{timeZone:"Europe/Tallinn",hour:"2-digit",minute:"2-digit",hourCycle:"h23"}).formatToParts(new Date()).map(x=>[x.type,x.value]));
+    const left=1440-(Number(p.hour)*60+Number(p.minute)); return `${Math.floor(left/60)} t ${left%60} min`}
+  catch(e){return ""}
 }
 function render(){
   const game=view==="daily"||view==="play";
-  $("homeView").hidden=view!=="home"; $("lbView").hidden=view!=="lb"; $("privView").hidden=view!=="priv";
+  $("homeView").hidden=view!=="home"; $("lbView").hidden=view!=="lb"; $("privView").hidden=view!=="priv"; $("ydayView").hidden=view!=="yday";
   $("levelsView").hidden=view!=="levels"; $("homeBtn").hidden=view==="home";
   $("gameView").style.display=game?"flex":"none";
   if(view==="home"){renderHome();return}
   if(view==="lb"){renderLb();return}
   if(view==="priv") return;
+  if(view==="yday"){renderYday();return}
   if(view==="levels"){renderLevels();return}
   const camp=S.mode==="camp", failed=S.done&&!S.won, cmp=failed&&!S.noAttempt;
   $("cmp").classList.toggle("two",cmp); $("solCol").hidden=!cmp;
@@ -105,24 +120,26 @@ function render(){
     tiles[w].classList.toggle("lock",!S.done&&near.some(c=>S.links[c]==="g"));
     tiles[w].classList.toggle("pin",!S.done&&near.some(c=>pinned(c)&&S.links[c]!=="g"))});
   $("app").classList.toggle("done",S.done);
-  $("gameLabel").textContent=camp?`Tase ${S.lvl+1}`:`Päevamäng · ${today().split("-").reverse().join(".")}`;
+  $("gameLabel").textContent=camp?`Tase ${S.lvl+1}`+(S.practice?" · harjutus":""):`Päevamäng · ${today().split("-").reverse().join(".")}`;
   $("time").textContent=fmt(S.ms/1000); $("moves").textContent=S.moves;
-  $("tries").innerHTML=Array.from({length:MAX},(_,i)=>`<i class="${i<S.checks?"used":""}"></i>`).join("");
+  $("tries").innerHTML=S.practice?"<small>kontrollimisi piiramatult</small>":Array.from({length:MAX},(_,i)=>`<i class="${i<S.checks?"used":""}"></i>`).join("");
   $("checkBtn").disabled=S.done||!S.dirty; $("checkBtn").hidden=S.done;
-  $("nextBtn").hidden=!(camp&&S.won&&S.lvl<CAMP.length-1);
+  $("nextBtn").hidden=!(camp&&S.won&&!S.practice&&S.lvl<CAMP.length-1);
+  $("hintBtn").hidden=S.done;
+  $("hintLine").hidden=S.done||!S.hint; $("hintLine").innerHTML=S.hint||"";
   $("retryBtn").hidden=!camp;
   $("levelsBtn").hidden=!camp;
   const rows=[];
   for(let c=1;c<N;c++) if(S.links[c]==="g"||S.links[c]==="o"){const j=judge(c); if(j[1]) rows.push(`<li class="${S.links[c]}"><b>${j[1][0]}</b>${j[1][1]}</li>`)}
   $("found").hidden=!rows.length; $("words").innerHTML=rows.join("");
   let msg="Puuduta kaht sõna, et need vahetada. Loe ülevalt alla: ülemine sõna + alumine sõna peab andma liitsõna. Puuduta joont, et paar lukku panna.";
-  if(camp&&!S.started){const L=CAMP[S.lvl];msg+=` Kolm tähte: alla ${fmt(L[1])}, kaks: alla ${fmt(L[2])}.`}
+  if(camp&&!S.started&&!S.practice){const L=CAMP[S.lvl];msg+=` Kolm tähte: alla ${fmt(L[1])}, kaks: alla ${fmt(L[2])}.`}
   if(!camp&&!S.started&&!S.ms) msg+=" Aeg hakkab jooksma esimesest puudutusest.";
   if(S.msg&&!S.done) msg=S.msg;
-  if(S.won) msg=`<b>Valmis!</b> Aeg ${fmt(S.ms/1000)}, käike ${S.moves}, kontrollimisi ${S.checks}.`+(camp?" "+starsHtml(S.stars):(S.old?" Uus püramiid tuleb homme.":""));
+  if(S.won) msg=`<b>Valmis!</b> Aeg ${fmt(S.ms/1000)}, käike ${S.moves}, kontrollimisi ${S.checks}.`+(S.hints?` Vihjeid ${S.hints}.`:"")+(camp?(S.practice?" Harjutus tehtud.":" "+starsHtml(S.stars)):(S.old?" Uus püramiid tuleb homme.":""));
   else if(S.done) msg=(S.noAttempt?"<b>See on lahendus.</b>":"<b>Kontrollimised said otsa.</b> Võrdle oma katset lahendusega.")+(camp?"":" Uus püramiid tuleb homme.");
   else if(S.checks&&!S.msg){const n=S.links.filter(l=>l==="g").length,o=S.links.filter(l=>l==="o").length;
-    msg=`Õiges kohas <b>${n}</b>, vales kohas <b>${o}</b>. Kontrollimisi alles ${MAX-S.checks}.`}
+    msg=`Õiges kohas <b>${n}</b>, vales kohas <b>${o}</b>. ${S.practice?"Kontrollida võid nii palju kui tahad.":`Kontrollimisi alles ${MAX-S.checks}.`}`}
   $("status").innerHTML=msg;
   $("lbBtn").hidden=camp||!S.done||lb.state==="off";
   $("shareBtn").hidden=camp||!S.done; if(camp||!S.done) $("sharePanel").hidden=true;
@@ -130,7 +147,7 @@ function render(){
 }
 function renderHome(){
   const rec=store.get("sp-daily",null), st=store.get("sp-camp",{}), stats=store.get("sp-stats",null);
-  $("subDaily").textContent=rec&&rec.date===today()?(rec.won?`Täna tehtud · ${fmt(rec.ms/1000)} · ${rec.moves} käiku`:"Täna ei õnnestunud. Homme tuleb uus."):"Tänane püramiid ootab. Üks katse päevas.";
+  $("subDaily").textContent=rec&&rec.date===today()?(rec.won?`Täna tehtud · ${fmt(rec.ms/1000)} · ${rec.moves} käiku`:"Täna ei õnnestunud.")+(untilNext()?` · uus püramiid ${untilNext()} pärast`:""):"Tänane püramiid ootab. Üks katse päevas.";
   $("subCamp").textContent=`Üksikmäng · ${CAMP.length} taset · ${Object.values(st).reduce((a,b)=>a+b,0)}/${CAMP.length*3} tähte`;
   $("optLb").hidden=lb.state==="off";
   $("subLb").textContent=lb.state==="ok"?(lb.rows.length?`${lb.rows.length} lõpetajat täna`:"Täna pole veel keegi lõpetanud"):lb.state==="loading"?"Laen…":"Edetabelit ei saa praegu kätte";
@@ -143,9 +160,11 @@ function renderHome(){
 function renderLevels(){
   const st=store.get("sp-camp",{}); const box=$("levels"); box.innerHTML="";
   $("campTitle").textContent=`Kampaania · ${CAMP.length} taset`;
-  CAMP.forEach((L,i)=>{const n=P[L[0]].w.length, open=i===0||st[i-1]>0;
+  $("practiceBtn").setAttribute("aria-pressed",practice);
+  $("practiceNote").textContent=practice?"Sees: lahendatud tasemed, piiramatult kontrollimisi, tähti ei anta.":"Väljas";
+  CAMP.forEach((L,i)=>{const n=P[L[0]].w.length, open=practice?st[i]>0:(i===0||st[i-1]>0);
     const b=document.createElement("button"); b.className="lvl"; b.disabled=!open;
-    b.innerHTML=`<span class="n">${i+1}</span>${starsHtml(st[i]||0)}<span class="sz">${n} sõna${open?"":" · lukus"}</span>`;
+    b.innerHTML=`<span class="n">${i+1}</span>${starsHtml(st[i]||0)}<span class="sz">${n} sõna${open?"":practice?" · lahendamata":" · lukus"}</span>`;
     b.addEventListener("click",()=>{hist.push(view);view="play";startGame("camp",L[0],i)}); box.appendChild(b)});
 }
 // Every pair that has been checked keeps its verdict for the rest of the game.
@@ -207,12 +226,23 @@ function check(){
   for(let c=1;c<N;c++){S.known[pk(c)]=1; if(judge(c)[1]) ok++}
   S.pins={}; refreshLinks(); S.msg=""; // verdicts replace the player's own locks
   if(ok===N-1){S.done=S.won=true; for(let c=1;c<N;c++) S.links[c]="g"; finish()}
-  else if(S.checks>=MAX){S.done=true; finish()}
+  else if(S.checks>=MAX&&!S.practice){S.done=true; finish()}
   sel=null; render();
+}
+// Hint: names one correct pair the player has not put together yet. Costs 30 seconds.
+function hint(){
+  if(S.done) return;
+  if(!S.started){S.started=true;lastTick=Date.now()}
+  const sol=P[S.pz].w; let pick=0;
+  for(let c=1;c<N&&!pick;c++){const i=S.order.indexOf(sol[c]); if(!(i>0&&S.order[parent(i)]===sol[parent(c)])) pick=c}
+  if(!pick) S.hint="Kõik õiged paarid on juba koos. Vajuta Kontrolli.";
+  else{tick(); S.ms+=30000; S.hints=(S.hints||0)+1;
+    S.hint=`<b>Vihje:</b> ${sol[parent(pick)]} + ${sol[pick]} = ${P[S.pz].s[pick-1][0]}. Ajale lisandus 30 sekundit.`}
+  render();
 }
 function finish(){
   if(S.mode==="camp"){
-    if(!S.won) return;
+    if(!S.won||S.practice) return;
     const L=CAMP[S.lvl], t=S.ms/1000; S.stars=t<=L[1]?3:t<=L[2]?2:1;
     const st=store.get("sp-camp",{}); if((st[S.lvl]||0)<S.stars){st[S.lvl]=S.stars;store.set("sp-camp",st)}
   }else{
@@ -236,7 +266,7 @@ function loadDaily(){
 function show(v){
   if(v==="daily"){view="daily";loadDaily()}
   else if(v==="play"&&campS){view="play";S=campS;S.pins=S.pins||{};prep();build();lastTick=Date.now();render()}
-  else{view=v==="play"?"levels":v;render();if(view==="lb") loadLb()}
+  else{view=v==="play"?"levels":v;render();if(view==="lb"){loadLb();if(lbMode==="week") loadWeek()}}
 }
 function nav(v){if(v!==view) hist.push(view);show(v)}
 function back(){show(hist.pop()||"home")}
@@ -249,7 +279,7 @@ async function api(path,opt={}){
   try{
     const r=await fetch(API+path,{...opt,signal:ctl.signal,headers:{apikey:SUPABASE_KEY,"Content-Type":"application/json",...(opt.headers||{})}});
     if(!r.ok){const e=new Error("http "+r.status);e.status=r.status;throw e}
-    return opt.method==="POST"?null:await r.json();
+    return opt.method==="POST"&&!opt.read?null:await r.json();
   }finally{clearTimeout(t)}
 }
 function playerId(){
@@ -278,9 +308,36 @@ async function submitScore(){
   }
   await loadLb();
 }
+// Weekly board: the last 7 days, summed per player by the database function weekly_scores().
+async function loadWeek(){
+  if(!API) return; if(wk.state!=="ok"){wk.state="loading";renderLb()}
+  try{const rows=await api("rpc/weekly_scores",{method:"POST",read:true,body:"{}"});
+    wk={state:"ok",rows:rows.map(r=>({n:String(r.nick).slice(0,16),d:Number(r.days),t:Number(r.seconds),m:Number(r.moves)})).filter(r=>isFinite(r.d)&&isFinite(r.t))}}
+  catch(e){wk.state=e.status===404?"missing":"slow"}
+  renderLb();
+}
+function renderWeek(){
+  const ol=$("lb"), note=$("lbNote"); ol.innerHTML=""; $("lbAdd").hidden=true;
+  note.textContent=wk.state==="loading"||wk.state==="idle"?"Laen edetabelit…"
+    :wk.state==="missing"?"Nädala edetabel ei ole veel sisse lülitatud."
+    :wk.state==="slow"?"Edetabelit ei õnnestu praegu kätte saada. Proovi hiljem uuesti."
+    :!wk.rows.length?"Viimase seitsme päeva jooksul pole veel keegi lõpetanud."
+    :"Viimased 7 päeva: kõigepealt lahendatud päevade arv, siis väikseim koguaeg.";
+  if(wk.state!=="ok") return;
+  const nick=store.get("sp-nick","");
+  wk.rows.forEach((r,i)=>{const li=document.createElement("li"); if(nick&&r.n===nick) li.className="me";
+    const a=document.createElement("span");a.className="rk";a.textContent=i+1;
+    const b=document.createElement("span");b.className="nm";b.textContent=r.n;
+    const c=document.createElement("span");c.textContent=`${r.d} p · ${fmt(r.t)}`;
+    const d=document.createElement("span");d.className="mv";d.textContent=r.m+" käiku";
+    li.append(a,b,c,d); ol.appendChild(li)});
+}
+function setLbMode(m){lbMode=m;if(m==="week") loadWeek();renderLb()}
 function renderLb(){
   if(view==="home"){renderHome();return}
   if(view!=="lb") return;
+  $("lbTabDay").setAttribute("aria-pressed",lbMode==="day"); $("lbTabWeek").setAttribute("aria-pressed",lbMode==="week");
+  if(lbMode==="week"){renderWeek();return}
   const ol=$("lb"), note=$("lbNote"), rec=myRec(), nick=store.get("sp-nick",""); ol.innerHTML=""; let n="";
   const me=rec&&rec.sub?lb.rows.findIndex(r=>r.n===nick&&r.t===Math.max(5,Math.round(rec.ms/1000))&&r.m===rec.moves):-1;
   $("lbAdd").hidden=!(API&&rec&&!rec.sub&&lb.state!=="off");
@@ -336,6 +393,12 @@ function share(){
 $("shareCopy").onclick=copyShare;
 $("shareSend").onclick=()=>{try{navigator.share({text:$("shareText").value}).catch(()=>{})}catch(e){}};
 $("shareBtn").onclick=share;
+$("hintBtn").onclick=hint;
+$("optYday").onclick=()=>nav("yday");
+$("practiceBtn").onclick=()=>{practice=!practice;renderLevels()};
+$("lbTabDay").onclick=()=>setLbMode("day");
+$("lbTabWeek").onclick=()=>setLbMode("week");
+setInterval(()=>{if(view==="home") renderHome()},30000); // keeps the countdown fresh
 // Report a word
 function openReport(){
   const found=[]; for(let c=1;c<N;c++){const j=judge(c); if(j[1]&&(S.links[c]==="g"||S.links[c]==="o")) found.push(j[1][0])}
@@ -378,7 +441,7 @@ const GUIDE=[
  {title:"Vaheta sõnu",text:"Puuduta üht sõna ja siis teist: need vahetavad kohad. Iga vahetus on üks käik. Püramiid on valmis, kui iga joon annab liitsõna.",
   slots:[[160,40],[85,130],[235,130]],links:[[0,1],[0,2]],tiles:["mahl","õun","puu"],
   frames:[{tap:["s",0],sel:[0],cap:"Puuduta sõna mahl."},{tap:["s",1],sel:[],swap:[[0,1]],cap:"Puuduta sõna õun: sõnad vahetavad kohad."},{cls:{0:"hl",1:"hl"},cap:"Nüüd saab lugeda: õunamahl ja õunapuu."}]},
- {title:"Kontrolli",text:"Kontrolli näitab iga joone kohta, kas paar sobib. Kontrollida saab ainult neli korda, nii et mõtle enne läbi. Kontrollitud paar jätab oma värvi meelde.",
+ {title:"Kontrolli",text:"Kontrolli näitab iga joone kohta, kas paar sobib. Kontrollida saab ainult neli korda, nii et mõtle enne läbi. Kontrollitud paar jätab oma värvi meelde. Kui jääd hätta, näitab nupp Vihje üht õiget paari ja lisab ajale 30 sekundit.",
   slots:[[160,30],[85,95],[235,95],[85,160]],links:[[0,1],[0,2],[1,3]],tiles:["töö","päev","raamat","kell"],btn:[272,160],
   frames:[{tap:["b"],cls:{0:"g",1:"o",2:"x"},cap:"Vajuta Kontrolli."},{tap:["l",0],cap:"Roheline: tööpäev on õige paar õiges kohas."},{tap:["l",1],cap:"Kollane: tööraamat on päris sõna, aga lahenduses on raamat mujal."},{tap:["l",2],cap:"Katkine joon: päev + kell ei anna liitsõna."}]},
  {title:"Lukusta paar",text:"Kui arvad, et kaks sõna käivad kokku, puuduta neid ühendavat joont. Joon muutub lillaks ja paar liigub edaspidi koos. Uus puudutus joonel võtab luku maha. Rohelised paarid on alati lukus.",
@@ -433,7 +496,7 @@ function closeGuide(){$("help").classList.remove("open");gClear()}
 $("helpBtn").onclick=openGuide; $("optGuide").onclick=openGuide; $("helpClose").onclick=closeGuide;
 $("gPrev").onclick=()=>gShow(Math.max(0,gI-1));
 $("gNext").onclick=()=>{if(gI===GUIDE.length-1) closeGuide(); else gShow(gI+1)};
-window.addEventListener("resize",()=>{if(S&&(view==="daily"||view==="play")) render()});
+window.addEventListener("resize",()=>{if(view==="yday"||(S&&(view==="daily"||view==="play"))) render()});
 setInterval(tick,500);
 function setTheme(m){
   if(m==="light"||m==="dark") document.documentElement.setAttribute("data-mode",m); else{m="system";document.documentElement.removeAttribute("data-mode")}
