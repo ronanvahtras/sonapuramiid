@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="et">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sõnapüramiid</title>
+<meta name="description" content="Eesti liitsõnade püramiidimäng: lao sõnad nii, et iga joon annaks ülevalt alla loetava liitsõna.">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="app" id="app">
+  <header>
+    <h1 id="title">Sõnapüramiid</h1>
+    <span style="flex:1"></span>
+    <button class="btn small" id="homeBtn" hidden>‹ Tagasi</button>
+    <button class="icon-btn" id="helpBtn" aria-label="Kuidas mängida">?</button>
+  </header>
+
+  <div id="homeView" class="home">
+    <button class="opt" id="optDaily"><b>Päevamäng</b><span id="subDaily"></span></button>
+    <button class="opt" id="optCamp"><b>Kampaania</b><span id="subCamp"></span></button>
+    <button class="opt" id="optLb"><b>Tänane edetabel</b><span id="subLb"></span></button>
+    <button class="opt" id="optGuide"><b>Kuidas mängida</b><span>Viis lühikest sammu liikuvate näidetega</span></button>
+    <div class="theme" id="theme"><span>Välimus:</span>
+      <button data-m="system">Süsteem</button><button data-m="light">Hele</button><button data-m="dark">Tume</button>
+    </div>
+  </div>
+
+  <div id="lbView" hidden>
+    <section>
+      <h2 id="lbTitle">Tänane edetabel</h2>
+      <p class="note" id="lbNote"></p>
+      <ol class="lb" id="lb"></ol>
+    </section>
+  </div>
+
+  <div id="levelsView" hidden>
+    <section>
+      <h2>Kampaania · 10 taset</h2>
+      <p class="note">Püramiid kasvab tasemetega. Mida kiiremini lahendad, seda rohkem tähti saad.</p>
+      <div class="levels" id="levels"></div>
+    </section>
+  </div>
+
+  <div id="gameView" style="display:none;flex-direction:column;gap:14px">
+    <div class="stats">
+      <span class="label" id="gameLabel"></span>
+      <span class="pill" id="timePill"><small>aeg</small><span id="time">0:00</span></span>
+      <span class="pill"><small>käigud</small><span id="moves">0</span></span>
+      <span class="pill tries" id="tries" aria-label="Kontrollimisi alles"></span>
+    </div>
+    <p class="status" id="status" aria-live="polite"></p>
+    <div class="cmp" id="cmp">
+      <div><h2 class="cap" id="mineCap" hidden>Sinu katse</h2><div class="board" id="board"><svg id="links" aria-hidden="true"></svg></div></div>
+      <div id="solCol" hidden><h2 class="cap">Lahendus</h2><div class="board" id="board2"></div></div>
+    </div>
+    <div class="legend">
+      <span><i style="background:var(--good)"></i>õige paar, liigub koos</span>
+      <span><i style="background:var(--pin)"></i>sinu lukustatud paar</span>
+      <span><i style="background:var(--near)"></i>liitsõna, aga vale koht</span>
+      <span><i class="brk"></i>katkine: ei sobi</span>
+    </div>
+    <div class="actions">
+      <button class="btn primary" id="checkBtn">Kontrolli</button>
+      <button class="btn primary" id="nextBtn" hidden>Järgmine tase</button>
+      <button class="btn" id="retryBtn">Alusta uuesti</button>
+      <button class="btn" id="levelsBtn">Tasemed</button>
+      <button class="btn" id="lbBtn" hidden>Edetabel</button>
+    </div>
+    <section id="found" hidden>
+      <h2>Leitud liitsõnad</h2>
+      <ul class="words" id="words"></ul>
+    </section>
+  </div>
+</div>
+
+<div class="overlay" id="help" role="dialog" aria-modal="true" aria-labelledby="gTitle">
+  <div class="sheet gd">
+    <div class="ghead"><span class="note" id="gStep"></span><button class="btn small" id="helpClose">Sulge</button></div>
+    <h2 id="gTitle"></h2>
+    <svg id="gSvg" viewBox="0 0 320 190" role="img" aria-labelledby="gCap"></svg>
+    <p class="gcap" id="gCap"></p>
+    <p id="gText"></p>
+    <div class="actions">
+      <button class="btn" id="gPrev">Eelmine</button>
+      <button class="btn primary" id="gNext">Järgmine</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/puzzles.js"></script>
+<script src="js/game.js"></script>
+</body>
+</html>
