@@ -5,6 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Sõnapüramiid</title>
 <meta name="description" content="Eesti liitsõnade püramiidimäng: lao sõnad nii, et iga joon annaks ülevalt alla loetava liitsõna.">
+<meta name="theme-color" content="#000000">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" href="icons/icon-192.png">
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -21,22 +25,54 @@
     <button class="opt" id="optCamp"><b>Kampaania</b><span id="subCamp"></span></button>
     <button class="opt" id="optLb"><b>Tänane edetabel</b><span id="subLb"></span></button>
     <button class="opt" id="optGuide"><b>Kuidas mängida</b><span>Viis lühikest sammu liikuvate näidetega</span></button>
+    <section id="statsSec" hidden style="padding-top:18px">
+      <h2>Sinu päevamängud</h2>
+      <p class="note" id="statsLine"></p>
+    </section>
     <div class="theme" id="theme"><span>Välimus:</span>
       <button data-m="system">Süsteem</button><button data-m="light">Hele</button><button data-m="dark">Tume</button>
     </div>
+    <div class="theme">
+      <span id="nickLine" hidden></span>
+      <button id="nickEdit" hidden>Muuda hüüdnime</button>
+      <button id="installBtn" hidden>Paigalda rakendusena</button>
+      <button id="privLink">Privaatsus</button>
+    </div>
+    <p class="note" id="iosHint" hidden>iPhone'is avakuvale lisamiseks: ava Safaris jagamismenüü ja vali «Lisa avakuvale».</p>
   </div>
 
   <div id="lbView" hidden>
     <section>
       <h2 id="lbTitle">Tänane edetabel</h2>
       <p class="note" id="lbNote"></p>
+      <button class="btn" id="lbAdd" hidden style="align-self:flex-start">Lisa minu tulemus</button>
       <ol class="lb" id="lb"></ol>
+    </section>
+  </div>
+
+  <div id="privView" hidden>
+    <section class="prose">
+      <h2>Privaatsus</h2>
+      <p>Sõnapüramiid kogub nii vähe andmeid kui võimalik. Kontot ega registreerimist ei ole.</p>
+      <h3>Mis salvestatakse sinu seadmes</h3>
+      <p>Sinu brauser hoiab mängu seisu: kampaania tähed, tänase päevamängu tulemus, sinu statistika, valitud välimus, hüüdnimi ja juhuslik mängija tunnus. Need andmed ei lahku seadmest, välja arvatud allpool kirjeldatud juhul. Kustutada saad need brauseri saidiandmete kustutamisega.</p>
+      <h3>Mis saadetakse edetabelisse</h3>
+      <p>Kui lõpetad päevamängu ja lisad tulemuse edetabelisse, salvestatakse serverisse sinu hüüdnimi, kuupäev, aeg, käikude ja kontrollimiste arv ning juhuslik mängija tunnus. Tunnus on vajalik selleks, et igalt mängijalt oleks päevas üks tulemus; teistele mängijatele seda ei näidata. Hüüdnimi, aeg ja käigud on kõigile nähtavad.</p>
+      <p>Ära kasuta hüüdnimena oma pärisnime ega muid isikuandmeid. Edetabelisse lisamine on vabatahtlik: mängida saab ka ilma.</p>
+      <h3>Veateated</h3>
+      <p>Kui teatad veast mõnes sõnas, salvestatakse sõna, sinu märkus ja püramiidi tunnus. Hüüdnime ega mängija tunnust veateatega ei seota.</p>
+      <h3>Kus ja kui kaua</h3>
+      <p>Edetabeli andmeid hoitakse Supabase'i andmebaasis. Tulemused kustutatakse 30 päeva pärast. Veebileht asub GitHub Pagesi serveris; nagu iga veebiserver, näeb see lehe laadimisel sinu IP-aadressi.</p>
+      <h3>Mida ei tehta</h3>
+      <p>Mängus ei ole reklaame, jälgimisküpsiseid ega külastusstatistika teenuseid. Andmeid ei müüda ega jagata kolmandatele isikutele.</p>
+      <h3>Kustutamine ja küsimused</h3>
+      <p id="privContact"></p>
     </section>
   </div>
 
   <div id="levelsView" hidden>
     <section>
-      <h2>Kampaania · 10 taset</h2>
+      <h2 id="campTitle">Kampaania</h2>
       <p class="note">Püramiid kasvab tasemetega. Mida kiiremini lahendad, seda rohkem tähti saad.</p>
       <div class="levels" id="levels"></div>
     </section>
@@ -55,10 +91,10 @@
       <div id="solCol" hidden><h2 class="cap">Lahendus</h2><div class="board" id="board2"></div></div>
     </div>
     <div class="legend">
-      <span><i style="background:var(--good)"></i>õige paar, liigub koos</span>
-      <span><i style="background:var(--pin)"></i>sinu lukustatud paar</span>
-      <span><i style="background:var(--near)"></i>liitsõna, aga vale koht</span>
-      <span><i class="brk"></i>katkine: ei sobi</span>
+      <span><i style="background:var(--good)"></i>✓ õige paar, liigub koos</span>
+      <span><i style="background:var(--pin)"></i>● sinu lukustatud paar</span>
+      <span><i style="background:var(--near)"></i>↔ liitsõna, aga vale koht</span>
+      <span><i class="brk"></i>× katkine: ei sobi</span>
     </div>
     <div class="actions">
       <button class="btn primary" id="checkBtn">Kontrolli</button>
@@ -66,11 +102,14 @@
       <button class="btn" id="retryBtn">Alusta uuesti</button>
       <button class="btn" id="levelsBtn">Tasemed</button>
       <button class="btn" id="lbBtn" hidden>Edetabel</button>
+      <button class="btn" id="shareBtn" hidden>Jaga tulemust</button>
     </div>
+    <p class="note" id="shareNote" aria-live="polite" hidden></p>
     <section id="found" hidden>
       <h2>Leitud liitsõnad</h2>
       <ul class="words" id="words"></ul>
     </section>
+    <button class="btn small" id="reportBtn" hidden style="align-self:flex-start">Teata veast sõnas</button>
   </div>
 </div>
 
@@ -88,6 +127,39 @@
   </div>
 </div>
 
+<div class="overlay" id="nickDlg" role="dialog" aria-modal="true" aria-labelledby="nickTitle">
+  <form class="sheet" id="nickForm">
+    <h2 id="nickTitle">Vali hüüdnimi</h2>
+    <p>Hüüdnimega läheb sinu päevamängu tulemus edetabelisse. Ära kasuta oma pärisnime.</p>
+    <label for="nickInput" class="note">Hüüdnimi (2–16 märki: tähed, numbrid, tühik, punkt, kriips)</label>
+    <input id="nickInput" class="field" maxlength="16" autocomplete="off" autocapitalize="off" spellcheck="false">
+    <p class="note" id="nickErr" aria-live="polite"></p>
+    <div class="actions">
+      <button class="btn primary" type="submit">Salvesta</button>
+      <button class="btn" type="button" id="nickSkip">Mitte praegu</button>
+    </div>
+    <p class="note">Mida salvestatakse, loe lehelt <button type="button" class="linkbtn" id="nickPriv">Privaatsus</button>.</p>
+  </form>
+</div>
+
+<div class="overlay" id="repDlg" role="dialog" aria-modal="true" aria-labelledby="repTitle">
+  <form class="sheet" id="repForm">
+    <h2 id="repTitle">Teata veast sõnas</h2>
+    <p>Kas mõni liitsõna on vale või kummaline? Või lükkas mäng tagasi päris sõna? Kirjuta see siia.</p>
+    <label for="repWord" class="note">Sõna</label>
+    <input id="repWord" class="field" maxlength="40" list="repList" autocomplete="off" autocapitalize="off">
+    <datalist id="repList"></datalist>
+    <label for="repNote" class="note">Märkus (soovi korral)</label>
+    <textarea id="repNote" class="field" maxlength="200" rows="3"></textarea>
+    <p class="note" id="repErr" aria-live="polite"></p>
+    <div class="actions">
+      <button class="btn primary" type="submit">Saada</button>
+      <button class="btn" type="button" id="repClose">Sulge</button>
+    </div>
+  </form>
+</div>
+
+<script src="js/config.js"></script>
 <script src="js/puzzles.js"></script>
 <script src="js/game.js"></script>
 </body>
