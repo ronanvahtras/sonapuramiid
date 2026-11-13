@@ -57,6 +57,19 @@ h1{font-weight:700;font-size:22px;margin:0;line-height:1.2}
 .cap{font-weight:700;font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:0 0 8px}
 div.tile{cursor:default}
 h1{cursor:pointer}
+.board .mk{pointer-events:none}
+.board .mk circle{fill:var(--bg);stroke-width:1.5}
+.board .mk text{font:700 10px var(--font);text-anchor:middle}
+.board .mk.g circle{stroke:var(--good)} .board .mk.g text{fill:var(--good)}
+.board .mk.o circle{stroke:var(--near)} .board .mk.o text{fill:var(--near)}
+.board .mk.p circle{stroke:var(--pin)} .board .mk.p text{fill:var(--pin)}
+.board .mk.x circle{stroke:var(--muted)} .board .mk.x text{fill:var(--muted)}
+.field{width:100%;padding:10px 12px;border:1px solid var(--ink);border-radius:0;background:var(--bg);color:var(--ink);font:16px var(--font)}
+.field:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.linkbtn{border:0;padding:0;font:inherit;color:var(--ink);text-decoration:underline;text-underline-offset:3px}
+.prose{max-width:620px}
+.prose h3{font-weight:700;font-size:16px;margin:10px 0 0}
+.prose p{margin:0;font-size:15.5px}
 .legend{display:flex;gap:14px;flex-wrap:wrap;color:var(--muted);font-size:13.5px}
 .legend span{display:inline-flex;align-items:center;gap:6px}
 .legend i{width:22px;height:4px;display:block}

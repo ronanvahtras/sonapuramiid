@@ -4,13 +4,17 @@ const board=$("board"), svg=$("links");
 const parent=c=>(c-1)>>1, depth=i=>Math.floor(Math.log2(i+1));
 const key=(a,b)=>a<b?a+"|"+b:b+"|"+a;
 const fmt=s=>{s=Math.max(0,Math.round(s));return Math.floor(s/60)+":"+String(s%60).padStart(2,"0")};
-const today=()=>{const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")};
-const dayNum=()=>{const d=new Date();return Math.floor(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())/864e5)};
+// The game's day follows Tallinn time, so the daily puzzle changes for everyone at once.
+const today=()=>{try{return new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Tallinn",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date())}
+  catch(e){const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")}};
+const dayNum=()=>{const [y,m,d]=today().split("-").map(Number);return Math.floor(Date.UTC(y,m-1,d)/864e5)};
 const store={get(k,f){try{return JSON.parse(localStorage.getItem(k))??f}catch(e){return f}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
 const starsHtml=n=>`<span class="stars">${"★".repeat(n)}<span class="off">${"★".repeat(3-n)}</span></span>`;
 
-let view="home", hist=[], dailyS=null, campS=null, S=null, N=15, pairs, solParent, solDepth, tiles={}, paths=[], hits=[], sel=null, lastTick=0;
-let db=null,user=null,uid=null,lb={state:"loading",rows:[],names:{}};
+let view="home", hist=[], dailyS=null, campS=null, S=null, N=15, pairs, solParent, solDepth, tiles={}, paths=[], hits=[], marks=[], sel=null, lastTick=0;
+const API=typeof SUPABASE_URL==="string"&&SUPABASE_URL&&typeof SUPABASE_KEY==="string"&&SUPABASE_KEY?SUPABASE_URL+"/rest/v1/":"";
+let lb={state:API?"loading":"off",rows:[]};
+const NICK_RE=/^[A-Za-zÕÄÖÜŠŽõäöüšž0-9 _.\-]{2,16}$/;
 
 function prep(){
   const z=P[S.pz]; N=z.w.length; pairs={}; solParent={}; solDepth={};
@@ -41,6 +45,8 @@ function showSolved(mode,pz,lvl,rec){
 function build(){
   board.querySelectorAll(".tile").forEach(e=>e.remove()); svg.innerHTML=""; tiles={}; paths=[]; sel=null;
   for(let c=1;c<N;c++){const p=document.createElementNS("http://www.w3.org/2000/svg","path");p.setAttribute("pathLength","100");svg.appendChild(p);paths[c]=p}
+  marks=[];for(let c=1;c<N;c++){const m=document.createElementNS("http://www.w3.org/2000/svg","g");m.setAttribute("class","mk");
+    m.innerHTML='<circle r="7"></circle><text y="3.5"></text>';m.style.display="none";svg.appendChild(m);marks[c]=m}
   hits=[];for(let c=1;c<N;c++){const h=document.createElementNS("http://www.w3.org/2000/svg","path");h.setAttribute("class","hit");h.addEventListener("click",()=>pin(c));svg.appendChild(h);hits[c]=h}
   S.order.forEach(w=>{const b=document.createElement("button");b.className="tile";b.type="button";b.textContent=w;
     b.addEventListener("click",()=>tap(w));board.appendChild(b);tiles[w]=b});
@@ -64,7 +70,8 @@ function layout(){
   S.order.forEach((w,i)=>{const p=g.pos(i),t=tiles[w];
     t.style.width=g.tw+"px";t.style.height=g.th+"px";t.style.fontSize=g.fs+"px";
     t.style.transform=`translate(${p.x-g.tw/2}px,${p.y-g.th/2}px)`});
-  for(let c=1;c<N;c++){const d=g.path(c);paths[c].setAttribute("d",d);hits[c].setAttribute("d",d)}
+  for(let c=1;c<N;c++){const d=g.path(c);paths[c].setAttribute("d",d);hits[c].setAttribute("d",d);
+    const q=paths[c].getPointAtLength(paths[c].getTotalLength()/2);marks[c].setAttribute("transform",`translate(${q.x},${q.y})`)}
 }
 function drawSolution(){ // read-only copy of the solved pyramid, shown beside a failed attempt
   const b=$("board2"), W=b.clientWidth, g=geom(W); b.style.height=g.H+"px";
@@ -77,17 +84,21 @@ function drawSolution(){ // read-only copy of the solved pyramid, shown beside a
 }
 function render(){
   const game=view==="daily"||view==="play";
-  $("homeView").hidden=view!=="home"; $("lbView").hidden=view!=="lb";
+  $("homeView").hidden=view!=="home"; $("lbView").hidden=view!=="lb"; $("privView").hidden=view!=="priv";
   $("levelsView").hidden=view!=="levels"; $("homeBtn").hidden=view==="home";
   $("gameView").style.display=game?"flex":"none";
   if(view==="home"){renderHome();return}
   if(view==="lb"){renderLb();return}
+  if(view==="priv"){$("privContact").textContent=(typeof SITE_CONTACT==="string"&&SITE_CONTACT)?`Kui soovid oma tulemuse kustutamist või sul on küsimusi, kirjuta aadressil ${SITE_CONTACT}. Lisa oma hüüdnimi ja kuupäev.`:"Kontaktaadress lisatakse siia peagi. Seni kustuvad tulemused iseenesest 30 päeva pärast.";return}
   if(view==="levels"){renderLevels();return}
   const camp=S.mode==="camp", failed=S.done&&!S.won, cmp=failed&&!S.noAttempt;
   $("cmp").classList.toggle("two",cmp); $("solCol").hidden=!cmp;
   $("mineCap").hidden=!failed; $("mineCap").textContent=S.noAttempt?"Lahendus":"Sinu katse";
   layout(); if(cmp) drawSolution();
-  for(let c=1;c<N;c++) paths[c].setAttribute("class",S.links[c]==="g"?"g":pinned(c)?"p":S.links[c]||"");
+  // Each state also has a symbol on the line, so it does not depend on colour alone.
+  for(let c=1;c<N;c++){const st=S.links[c]==="g"?"g":pinned(c)?"p":S.links[c]||"";
+    paths[c].setAttribute("class",st); marks[c].style.display=st?"":"none"; marks[c].setAttribute("class","mk "+st);
+    marks[c].lastChild.textContent={g:"✓",o:"↔",p:"●",x:"×"}[st]||""}
   const selG=sel===null?[]:groupOf(S.order.indexOf(sel));
   S.order.forEach((w,i)=>{tiles[w].classList.toggle("sel",selG.includes(i));
     const near=[i,2*i+1,2*i+2].filter(c=>c>0&&c<N);
@@ -114,16 +125,24 @@ function render(){
     msg=`Õiges kohas <b>${n}</b>, vales kohas <b>${o}</b>. Kontrollimisi alles ${MAX-S.checks}.`}
   $("status").innerHTML=msg;
   $("lbBtn").hidden=camp||!S.done||lb.state==="off";
+  $("shareBtn").hidden=camp||!S.done; if(!S.done){$("shareNote").hidden=true}
+  $("reportBtn").hidden=!API||!(rows.length||S.done);
 }
 function renderHome(){
-  const rec=store.get("sp-daily",null), st=store.get("sp-camp",{});
+  const rec=store.get("sp-daily",null), st=store.get("sp-camp",{}), stats=store.get("sp-stats",null);
   $("subDaily").textContent=rec&&rec.date===today()?(rec.won?`Täna tehtud · ${fmt(rec.ms/1000)} · ${rec.moves} käiku`:"Täna ei õnnestunud. Homme tuleb uus."):"Tänane püramiid ootab. Üks katse päevas.";
-  $("subCamp").textContent=`Üksikmäng · 10 taset · ${Object.values(st).reduce((a,b)=>a+b,0)}/30 tähte`;
-  $("optLb").hidden=lb.state==="off"; // no shared score store on the plain website yet
-  $("subLb").textContent=lb.state==="ok"?(lb.rows.length?`${lb.rows.length} lõpetajat täna`:"Täna pole veel keegi lõpetanud"):lb.state==="loading"?"Laen…":"Pole selles vaates saadaval";
+  $("subCamp").textContent=`Üksikmäng · ${CAMP.length} taset · ${Object.values(st).reduce((a,b)=>a+b,0)}/${CAMP.length*3} tähte`;
+  $("optLb").hidden=lb.state==="off";
+  $("subLb").textContent=lb.state==="ok"?(lb.rows.length?`${lb.rows.length} lõpetajat täna`:"Täna pole veel keegi lõpetanud"):lb.state==="loading"?"Laen…":"Edetabelit ei saa praegu kätte";
+  $("statsSec").hidden=!(stats&&stats.played);
+  if(stats&&stats.played){const streak=stats.last>=dayNum()-1?stats.streak:0;
+    $("statsLine").textContent=`Mängitud ${stats.played} · võidetud ${stats.won} · seeria ${streak} päeva · pikim seeria ${stats.max}`+(stats.best!=null?` · parim aeg ${fmt(stats.best)}`:"")}
+  const n=store.get("sp-nick","");
+  $("nickLine").hidden=$("nickEdit").hidden=!API||!n; $("nickLine").textContent=n?`Hüüdnimi: ${n}`:"";
 }
 function renderLevels(){
   const st=store.get("sp-camp",{}); const box=$("levels"); box.innerHTML="";
+  $("campTitle").textContent=`Kampaania · ${CAMP.length} taset`;
   CAMP.forEach((L,i)=>{const n=P[L[0]].w.length, open=i===0||st[i-1]>0;
     const b=document.createElement("button"); b.className="lvl"; b.disabled=!open;
     b.innerHTML=`<span class="n">${i+1}</span>${starsHtml(st[i]||0)}<span class="sz">${n} sõna${open?"":" · lukus"}</span>`;
@@ -198,6 +217,12 @@ function finish(){
     const st=store.get("sp-camp",{}); if((st[S.lvl]||0)<S.stars){st[S.lvl]=S.stars;store.set("sp-camp",st)}
   }else{
     store.set("sp-daily",{date:today(),won:S.won,ms:S.ms,moves:S.moves,checks:S.checks,order:S.won?null:S.order});
+    const st=store.get("sp-stats",{played:0,won:0,streak:0,max:0,best:null,last:null}), dn=dayNum();
+    st.played++;
+    if(S.won){st.won++; st.streak=st.last===dn-1?st.streak+1:1; st.max=Math.max(st.max,st.streak);
+      const sec=Math.round(S.ms/1000); st.best=st.best==null?sec:Math.min(st.best,sec); st.last=dn}
+    else st.streak=0;
+    store.set("sp-stats",st);
     if(S.won) submitScore();
   }
 }
@@ -207,67 +232,120 @@ function loadDaily(){
   else if(dailyS&&dailyS.day===today()&&!dailyS.done){S=dailyS;prep();build();lastTick=Date.now();render()}
   else{startGame("daily",pz,null,dayNum());S.day=today();dailyS=S}
 }
-// Screens: home, daily, levels, play, lb. "Tagasi" walks back through the screens visited.
+// Screens: home, daily, levels, play, lb, priv. "Tagasi" walks back through the screens visited.
 function show(v){
   if(v==="daily"){view="daily";loadDaily()}
   else if(v==="play"&&campS){view="play";S=campS;S.pins=S.pins||{};prep();build();lastTick=Date.now();render()}
-  else{view=v==="play"?"levels":v;render();if(view==="lb"&&db) loadLb()}
+  else{view=v==="play"?"levels":v;render();if(view==="lb") loadLb()}
 }
 function nav(v){if(v!==view) hist.push(view);show(v)}
 function back(){show(hist.pop()||"home")}
 function openHome(){hist=[];view="home";render()}
 
-// Daily leaderboard: one document per player (scores/<their id>), holding their latest day.
-async function initCaps(){
+// Daily leaderboard, kept in Supabase (tables and rules: supabase/setup.sql). There are no
+// accounts: a player is a random id kept in this browser plus a nickname of their choice.
+async function api(path,opt={}){
+  const ctl=new AbortController(), t=setTimeout(()=>ctl.abort(),10000);
   try{
-    if(!window.claude?.use){lb.state="off";renderLb();return}
-    [db,user]=await Promise.all([claude.use("db"),claude.use("user")]);
-    uid=user?await user.id():null;
-    if(!db){lb.state="off";renderLb();return}
-    await loadLb();
-    const rec=store.get("sp-daily",null);
-    if(rec&&rec.date===today()&&rec.won&&uid&&!lb.rows.some(r=>r.id===uid)) submitScore(rec);
-  }catch(e){lb.state="off";renderLb()}
+    const r=await fetch(API+path,{...opt,signal:ctl.signal,headers:{apikey:SUPABASE_KEY,"Content-Type":"application/json",...(opt.headers||{})}});
+    if(!r.ok){const e=new Error("http "+r.status);e.status=r.status;throw e}
+    return opt.method==="POST"?null:await r.json();
+  }finally{clearTimeout(t)}
 }
+function playerId(){
+  let id=store.get("sp-player",null);
+  if(!id){id=crypto.randomUUID?crypto.randomUUID():"10000000-1000-4000-8000-100000000000".replace(/[018]/g,c=>(c^crypto.getRandomValues(new Uint8Array(1))[0]&15>>c/4).toString(16));store.set("sp-player",id)}
+  return id;
+}
+const myRec=()=>{const r=store.get("sp-daily",null);return r&&r.date===today()&&r.won?r:null};
 async function loadLb(){
-  if(!db) return; if(lb.state!=="ok"){lb.state="loading";renderLb()}
-  const timer=setTimeout(()=>{if(lb.state==="loading"){lb.state="slow";renderLb()}},10000);
+  if(!API) return; if(lb.state!=="ok"){lb.state="loading";renderLb()}
   try{
-    const q=await db.collection("scores").where("d","==",today()).get(); clearTimeout(timer);
-    const rows=q.docs.map(d=>({id:d.id,t:Number(d.data().t),m:Number(d.data().m)})).filter(r=>isFinite(r.t)&&isFinite(r.m)).sort((a,b)=>a.t-b.t||a.m-b.m).slice(0,50);
-    let names={}; try{if(user) names=await user.profiles(rows.map(r=>r.id))||{}}catch(e){}
-    lb={state:"ok",rows,names};
-  }catch(e){clearTimeout(timer);lb.state="off"}
+    const rows=await api(`scores?day=eq.${today()}&select=nick,seconds,moves&order=seconds.asc,moves.asc&limit=200`);
+    lb={state:"ok",rows:rows.map(r=>({n:String(r.nick).slice(0,16),t:Number(r.seconds),m:Number(r.moves)})).filter(r=>isFinite(r.t)&&isFinite(r.m)),fail:lb.fail};
+  }catch(e){lb.state="slow"}
   renderLb();
 }
-async function submitScore(rec){
-  const r=rec||{ms:S.ms,moves:S.moves,checks:S.checks};
-  if(!db||!uid){renderLb();return}
-  try{await db.doc("scores/"+uid).set({d:today(),t:Math.round(r.ms/1000),m:r.moves,c:r.checks});await loadLb()}
-  catch(e){lb.fail=true;renderLb()}
+async function submitScore(){
+  const rec=myRec(); if(!API||!rec||rec.sub) return;
+  const n=store.get("sp-nick",""); if(!n){openNick();return}
+  try{
+    await api("scores",{method:"POST",headers:{Prefer:"return=minimal"},body:JSON.stringify({day:today(),player:playerId(),nick:n,seconds:Math.max(5,Math.round(rec.ms/1000)),moves:rec.moves,checks:rec.checks})});
+    rec.sub=true; store.set("sp-daily",rec); lb.fail=false;
+  }catch(e){
+    if(e.status===409){rec.sub=true;store.set("sp-daily",rec)} // already on the board for today
+    else lb.fail=true;
+  }
+  await loadLb();
 }
 function renderLb(){
   if(view==="home"){renderHome();return}
   if(view!=="lb") return;
-  const ol=$("lb"), note=$("lbNote"); ol.innerHTML=""; let n="";
+  const ol=$("lb"), note=$("lbNote"), rec=myRec(), nick=store.get("sp-nick",""); ol.innerHTML=""; let n="";
+  const me=rec&&rec.sub?lb.rows.findIndex(r=>r.n===nick&&r.t===Math.max(5,Math.round(rec.ms/1000))&&r.m===rec.moves):-1;
+  $("lbAdd").hidden=!(API&&rec&&!rec.sub&&lb.state!=="off");
   if(lb.state==="loading") n="Laen edetabelit…";
-  else if(lb.state==="slow") n="Edetabelit ei õnnestu praegu kätte saada.";
-  else if(lb.state==="off") n="Edetabel pole selles vaates saadaval. Sinu tulemus on näha üleval.";
+  else if(lb.state==="slow") n="Edetabelit ei õnnestu praegu kätte saada. Proovi hiljem uuesti.";
+  else if(lb.state==="off") n="Edetabel ei ole sisse lülitatud.";
+  else if(lb.fail) n="Sinu tulemust ei õnnestunud salvestada. Proovi uuesti nupust «Lisa minu tulemus».";
   else if(!lb.rows.length) n="Täna pole veel keegi lõpetanud. Ole esimene!";
-  else if(lb.fail) n="Sinu tulemust ei õnnestunud salvestada.";
-  else{const i=lb.rows.findIndex(r=>r.id===uid), k=lb.rows.length;
-    n=i<0?"Järjestus: kiireim aeg, võrdse aja korral vähem käike."
+  else{const k=lb.rows.length;
+    n=me<0?"Järjestus: kiireim aeg, võrdse aja korral vähem käike."
       :k===1?"Oled täna esimene lõpetaja."
-      :`Olid kiirem kui ${Math.round((k-1-i)/(k-1)*100)}% tänastest mängijatest (${i+1}. koht ${k} seast).`}
+      :`Olid kiirem kui ${Math.round((k-1-me)/(k-1)*100)}% tänastest mängijatest (${me+1}. koht ${k} seast).`}
   note.textContent=n;
   if(lb.state!=="ok") return;
-  lb.rows.forEach((r,i)=>{const li=document.createElement("li"); if(r.id===uid) li.className="me";
+  lb.rows.forEach((r,i)=>{const li=document.createElement("li"); if(i===me) li.className="me";
     const a=document.createElement("span");a.className="rk";a.textContent=i+1;
-    const b=document.createElement("span");b.className="nm";b.textContent=(lb.names[r.id]&&lb.names[r.id].name)||"Mängija";
+    const b=document.createElement("span");b.className="nm";b.textContent=r.n;
     const c=document.createElement("span");c.textContent=fmt(r.t);
     const d=document.createElement("span");d.className="mv";d.textContent=r.m+" käiku";
     li.append(a,b,c,d); ol.appendChild(li)});
 }
+// Nickname dialog
+function openNick(){$("nickInput").value=store.get("sp-nick","");$("nickErr").textContent="";$("nickDlg").classList.add("open");$("nickInput").focus()}
+function closeNick(){$("nickDlg").classList.remove("open")}
+$("nickForm").addEventListener("submit",e=>{e.preventDefault();
+  const v=$("nickInput").value.trim().replace(/\s+/g," ");
+  if(!NICK_RE.test(v)){$("nickErr").textContent="Hüüdnimes peab olema 2–16 märki: tähed, numbrid, tühik, punkt, alakriips või sidekriips.";return}
+  store.set("sp-nick",v); closeNick(); renderHome(); submitScore()});
+$("nickSkip").onclick=closeNick;
+$("nickPriv").onclick=()=>{closeNick();nav("priv")};
+$("nickEdit").onclick=openNick;
+$("lbAdd").onclick=()=>{lb.fail=false;submitScore()};
+$("privLink").onclick=()=>nav("priv");
+// Share today's result
+async function share(){
+  const rec=store.get("sp-daily",null); if(!rec||rec.date!==today()) return;
+  const d=today().split("-").reverse().slice(0,2).join(".");
+  const text=(rec.won?`Sõnapüramiid ${d} · ${fmt(rec.ms/1000)} · ${rec.moves} käiku · ${rec.checks} kontrolli`:`Sõnapüramiid ${d} · täna jäi püramiid lahendamata`)+"\n"+location.origin+location.pathname;
+  const note=$("shareNote"); note.hidden=false;
+  try{if(navigator.share){await navigator.share({text});note.hidden=true;return}}catch(e){if(e&&e.name==="AbortError"){note.hidden=true;return}}
+  try{await navigator.clipboard.writeText(text);note.textContent="Tulemus on kopeeritud. Kleebi see sõnumisse."}
+  catch(e){note.textContent=text}
+}
+$("shareBtn").onclick=share;
+// Report a word
+function openReport(){
+  const found=[]; for(let c=1;c<N;c++){const j=judge(c); if(j[1]&&(S.links[c]==="g"||S.links[c]==="o")) found.push(j[1][0])}
+  $("repList").innerHTML=found.map(w=>`<option value="${w}">`).join("");
+  $("repWord").value="";$("repNote").value="";$("repErr").textContent="";$("repDlg").classList.add("open");$("repWord").focus();
+}
+$("reportBtn").onclick=openReport;
+$("repClose").onclick=()=>$("repDlg").classList.remove("open");
+$("repForm").addEventListener("submit",async e=>{e.preventDefault();
+  const word=$("repWord").value.trim(), note=$("repNote").value.trim();
+  if(word.length<2){$("repErr").textContent="Kirjuta sõna, mille kohta teade käib.";return}
+  $("repErr").textContent="Saadan…";
+  try{await api("reports",{method:"POST",headers:{Prefer:"return=minimal"},body:JSON.stringify({puzzle:S?S.pz:"-",word,note})});
+    $("repErr").textContent="Aitäh! Teade on saadetud.";$("repWord").value="";$("repNote").value=""}
+  catch(err){$("repErr").textContent="Teadet ei õnnestunud saata. Proovi hiljem uuesti."}});
+// Install to home screen
+let installEvt=null;
+window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();installEvt=e;$("installBtn").hidden=false});
+$("installBtn").onclick=async()=>{if(!installEvt) return;installEvt.prompt();try{await installEvt.userChoice}catch(e){}installEvt=null;$("installBtn").hidden=true};
+if(/iphone|ipad|ipod/i.test(navigator.userAgent)&&!navigator.standalone) $("iosHint").hidden=false;
+if("serviceWorker" in navigator&&location.protocol==="https:") navigator.serviceWorker.register("sw.js").catch(()=>{});
 
 $("checkBtn").onclick=check;
 $("retryBtn").onclick=()=>startGame("camp",S.pz,S.lvl);
@@ -354,13 +432,9 @@ function setTheme(m){
 $("theme").querySelectorAll("button").forEach(b=>b.onclick=()=>setTheme(b.dataset.m));
 setTheme(store.get("sp-theme","system"));
 
-function start(data){
-  const v=data&&data.view;
-  if((v==="daily"||v==="play")&&data.S&&P[data.S.pz]&&(data.S.mode==="camp"||data.day===today())){
-    view=v;S=data.S;S.known=S.known||{};S.pins=S.pins||{};if(S.mode==="daily"&&!S.old)dailyS=S;prep();build();lastTick=Date.now();render()}
-  else{view=v==="levels"||v==="lb"?v:"home";render()}
-  initCaps();
+function start(){
+  view="home"; render();
+  if(API) loadLb().then(()=>{const r=myRec(); if(r&&!r.sub&&store.get("sp-nick","")) submitScore()});
   if(!store.get("sp-guide",0)){store.set("sp-guide",1); if(store.get("sp-guide",0)) openGuide()}
 }
-window.claude?.hot?.snapshot?.(()=>({view,S,day:today()}));
-window.claude?.hot?.ready?window.claude.hot.ready(start):start(window.claude?.hot?.data??{});
+start();

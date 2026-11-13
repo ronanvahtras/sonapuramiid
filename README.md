@@ -15,10 +15,34 @@ Open `index.html` in a browser. Nothing needs to be installed.
 
 | File | What it holds |
 | --- | --- |
-| `index.html` | Page structure: home screen, game screen, leaderboard, guide |
+| `index.html` | Page structure: home, game, leaderboard, privacy page, guide, dialogs |
 | `css/style.css` | All styling. Every colour is a token in the `:root` block at the top |
+| `js/config.js` | Supabase address and publishable key, public contact address |
 | `js/puzzles.js` | Puzzle data, the campaign level list and the daily pool |
-| `js/game.js` | Game logic, navigation, the animated guide |
+| `js/game.js` | Game logic, navigation, leaderboard, sharing, the animated guide |
+| `supabase/setup.sql` | Database tables and access rules for the leaderboard and word reports |
+| `sw.js`, `manifest.webmanifest`, `icons/` | Install to home screen and offline play |
+
+## Leaderboard setup
+
+The daily leaderboard and the "report a word" form use a Supabase database.
+
+1. In the Supabase dashboard open the SQL editor, paste the contents of
+   `supabase/setup.sql` and run it. It creates the `scores` and `reports` tables, the
+   access rules, and a nightly job that deletes scores older than 30 days.
+2. `js/config.js` already holds the project address and the publishable key. The
+   publishable key is safe to keep in the code; a secret key must never be added.
+3. Set `SITE_CONTACT` in `js/config.js` to the public address shown on the privacy page.
+
+How it works: players have no accounts. Each browser keeps a random id and a nickname.
+One result per player per day is accepted, only for the current day in Tallinn time.
+The website can read nicknames, times and moves, but not player ids. Reported words
+appear in the `reports` table; rude nicknames can be removed by deleting the row in the
+`scores` table.
+
+Known limit: the game runs in the browser, so a determined player can submit a made-up
+time. The database rejects impossible values, but real cheat-proofing needs the server to
+check each game.
 
 ## Design
 
@@ -52,7 +76,8 @@ limits in seconds for three and two stars).
 
 ## Not built yet
 
-- **Leaderboard and nicknames.** These need a server. On the plain website the leaderboard
-  entry is hidden; the daily game and campaign work fully.
-- **Once-a-day limit and progress** are stored in the browser only.
+- **Cheat-proof scores** (see the known limit above).
+- **Accounts.** Progress, statistics and the once-a-day limit are stored in the browser
+  only, so they do not follow a player to another device.
 - **Daily puzzle pool** is 8 puzzles; the target is around 80.
+- **Campaign** has 20 levels; the target is 30.
